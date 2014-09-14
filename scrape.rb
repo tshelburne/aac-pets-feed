@@ -10,8 +10,8 @@ OptionParser.new do |opts|
 end.parse!
 
 client = SODA::Client.new domain: 'data.austintexas.gov'
-
 results = client.get 'kz4x-q9k5'
+puts "Retrieved #{results.count} results..."
 
 def result_to_hash(result)
 	{
@@ -29,16 +29,17 @@ def result_to_hash(result)
 	}
 end
 
+puts 'Formatting result data...'
 result_hashes = results.each_with_index.reduce({}) do |hashes, (result, index)| 
 	hashes[index.to_s.to_sym] = result_to_hash(result)
 	hashes
 end
 
+puts 'Posting to Pet Alerts...'
 domain, username, password = options[:env] == 'development' ? [ 'localhost:3000', 'username', 'password' ] : [ 'pet-alert.herokuapp.com', ENV['http_username'], ENV['http_password'] ]
-
 res = HTTP.auth(:basic, user: username, pass: password).post "http://#{domain}/populator/update", json: { pets: result_hashes }
 
-puts res.body if res.code != 200
+puts res.code != 200 ? res.body : 'Everything looks good...' 
 
 # EXAMPLE DATA RETURNED FROM AAC
 # {
