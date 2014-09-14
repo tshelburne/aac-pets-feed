@@ -34,9 +34,9 @@ result_hashes = results.each_with_index.reduce({}) do |hashes, (result, index)|
 	hashes
 end
 
-username, password = options[:env] == 'development' ? [ 'username', 'password' ] : [ ENV['http_username'], ENV['http_password'] ]
+domain, username, password = options[:env] == 'development' ? [ 'localhost:3000', 'username', 'password' ] : [ 'pet-alert.herokuapp.com', ENV['http_username'], ENV['http_password'] ]
 
-res = HTTP.auth(:basic, user: username, pass: password).post 'http://localhost:3000/populator/update', json: { pets: result_hashes }
+res = HTTP.auth(:basic, user: username, pass: password).post "http://#{domain}/populator/update", json: { pets: result_hashes }
 
 puts res.body if res.code != 200
 
