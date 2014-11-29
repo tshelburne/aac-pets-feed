@@ -1,6 +1,7 @@
 require 'bundler'
 Bundler.require
 require 'optparse'
+require_relative 'models/image'
 
 options = {}
 OptionParser.new do |opts|
@@ -17,6 +18,7 @@ def result_to_hash(result)
 	{
 		species: result.type.downcase, 
 		name: '', 
+		image: Image.from_pet_id(result.animal_id).url,
 		pet_id: result.animal_id, 
 		gender: result.sex.match(/(M|m)ale/) ? 'male' : 'female', 
 		fixed: !result.sex.match(/(I|i)ntact/), 
