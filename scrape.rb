@@ -20,7 +20,7 @@ def result_to_hash(result)
 		name: '', 
 		image: Image.from_pet_id(result.animal_id).url,
 		pet_id: result.animal_id, 
-		gender: result.sex.match(/(M|m)ale/) ? 'male' : 'female', 
+		gender: result.sex.match(/(Fem|fem)ale/) ? 'female' : 'male', 
 		fixed: !result.sex.match(/(I|i)ntact/), 
 		breed: result.looks_like, 
 		found_on: result.intake_date, 
