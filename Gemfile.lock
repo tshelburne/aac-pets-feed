@@ -2,7 +2,7 @@ GEM
   remote: https://rubygems.org/
   specs:
     hashie (3.3.1)
-    http (0.6.2)
+    http (0.6.3)
       http_parser.rb (~> 0.6.0)
     http_parser.rb (0.6.0)
     soda-ruby (0.2.12)
