@@ -14,3 +14,6 @@ PLATFORMS
 DEPENDENCIES
   http
   soda-ruby
+
+BUNDLED WITH
+   1.10.4

@@ -1,6 +1,8 @@
 require 'bundler'
 Bundler.require
 require 'optparse'
+require 'time'
+require 'json'
 require_relative 'models/image'
 
 options = {}
@@ -10,49 +12,58 @@ OptionParser.new do |opts|
 	end
 end.parse!
 
+domain, username, password = options[:env] == 'development' ? [ 'localhost:3000', 'username', 'password' ] : [ 'pet-alert.herokuapp.com', ENV['http_username'], ENV['http_password'] ]
+pa_client = HTTP.auth(:basic, user: username, pass: password)
+
 client = SODA::Client.new domain: 'data.austintexas.gov'
-results = client.get 'kz4x-q9k5'
+results = client.get 'hjeh-idye', {'$limit'=>50000}
 puts "Retrieved #{results.count} results..."
 
 def result_to_hash(result)
+	intake_date = result.intake_date.split('/')
 	{
-		species: result.type.downcase, 
-		name: '', 
+		species: result.animal_type.downcase,
+		name: result.name,
 		image: Image.from_pet_id(result.animal_id).url,
-		pet_id: result.animal_id, 
-		gender: result.sex.match(/(Fem|fem)ale/) ? 'female' : 'male', 
-		fixed: !result.sex.match(/(I|i)ntact/), 
-		breed: result.looks_like, 
-		found_on: result.intake_date, 
+		pet_id: result.animal_id,
+		gender: result.sex_upon_intake.match(/(Fem|fem)ale/) ? 'female' : 'male',
+		fixed: !result.sex_upon_intake.match(/(I|i)ntact/),
+		breed: result.breed,
+		found_on: Time.new("20#{intake_date[2]}", intake_date[0], intake_date[1]).iso8601,
 		scraped_at: Time.now.to_s,
-		shelter_name: 'Austin Animal Center', 
-		color: result.color, 
-		active: !!result.at_aac.match(/(Y|y)es/) 
+		shelter_name: 'Austin Animal Center',
+		color: result.color,
+		active: true
 	}
 end
 
+puts 'Getting pet ids from Pet Alerts...'
+pets_in_database = JSON.parse pa_client.get("http://#{domain}/pets/external-ids").body
+
+puts 'Limiting push set...'
+unscraped_results = results.select {|result| !pets_in_database.include? result.animal_id }
+
 puts 'Formatting result data...'
-result_hashes = results.each_with_index.reduce({}) do |hashes, (result, index)| 
+result_hashes = unscraped_results.each_with_index.reduce({}) do |hashes, (result, index)|
 	hashes[index.to_s.to_sym] = result_to_hash(result)
 	hashes
 end
 
-puts 'Posting to Pet Alerts...'
-domain, username, password = options[:env] == 'development' ? [ 'localhost:3000', 'username', 'password' ] : [ 'pet-alert.herokuapp.com', ENV['http_username'], ENV['http_password'] ]
-res = HTTP.auth(:basic, user: username, pass: password).post "http://#{domain}/populator/update", json: { pets: result_hashes }
+puts "Posting #{result_hashes.count} pets to Pet Alerts..."
+res = pa_client.post "http://#{domain}/populator/update", json: { pets: result_hashes }
 
-puts res.code != 200 ? res.body : 'Everything looks good...' 
+puts res.code != 200 ? res.body : 'Everything looks good...'
 
 # EXAMPLE DATA RETURNED FROM AAC
-# {
-# 	"sex"=>"Neutered Male", 
-# 	"looks_like"=>"Labrador Retriever Mix", 
-# 	"color"=>"Tan/White", 
-# 	"location"=>#<Hashie::Mash human_address="{\"address\":\"9316 MORIN DR\",\"city\":\"\",\"state\":\"\",\"zip\":\"78621\"}" latitude="30.286854711000444" longitude="-97.4511984399997" needs_recoding=false>, 
-# 	"age"=>"2 years", 
-# 	"intake_date"=>"2014-09-07T00:00:00", 
-# 	"image"=>#<Hashie::Mash url="http://www.petharbor.com/pet.asp?uaid=ASTN.A687601">, 
-# 	"at_aac"=>"Yes (come to the shelter)", 
-# 	"type"=>"Dog", 
-# 	"animal_id"=>"A687601"
-# }
+# [["sex_upon_intake", "Intact Male"],
+#  ["breed", "Dachshund/Chihuahua Shorthair"],
+#  ["intake_condition", "Normal"],
+#  ["color", "Sable/Tan"],
+#  ["name", "Louie"],
+#  ["age_upon_intake", "4 months"],
+#  ["intake_date", "10/01/14"],
+#  ["found_location", "3005 S. Lamar in Austin (TX)"],
+#  ["animal_type", "Dog"],
+#  ["intake_type", "Stray"],
+#  ["intake_time", "7:21AM"],
+#  ["animal_id", "A689228"]]
